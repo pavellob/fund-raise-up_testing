@@ -1,0 +1,25 @@
+{
+  "name": "@types/fru",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "source": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
+    "dev": "tsc -w",
+    "lint": "eslint \"src/**/*.ts*\""
+  },
+  "dependencies": {
+    "mongodb": "^5.5.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.32.0",
+    "tsconfig": "workspace:*",
+    "typescript": "^4.8.3"
+  }
+}
