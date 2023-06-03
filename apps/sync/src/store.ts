@@ -1,53 +1,52 @@
-import { Customer } from "fru";
+import { DocumentWithId } from "fru";
 
-const DEFAULT_TIMEOUT_MS = 1000; // Default timeout value in milliseconds
-const DEFAULT_BUNCH_SIZE = 1000; // Number of customers to process in each batch
+export default class Store<T extends DocumentWithId> {
+  private static readonly DEFAULT_TIMEOUT_MS = 1000;
+  private static readonly DEFAULT_BUNCH_SIZE = 1000;
+  private readonly timeout: number;
+  
+  private store: T[];
+  private intervalId: NodeJS.Timer;
+  private bunchSize: number;
+  private saveToDb: (bunch: T[]) => void;
 
-let store: Customer[] = []; // Array to store anonymized customers
-let intervalId: NodeJS.Timer; // Interval ID for periodic storage task
-let saveToDb: (bunch: Customer[]) => void;
-let bunchSize: number;
-
-/**
- * Add customers to the anonymized store.
- * Store anonymized customers to the database when store has DEFAULT_BUNCH_SIZE or more
- * @param data - The customer Customer or an array of customer CuCustomers.
- */
-function add(data: Customer | Customer[]): void {
-  if (Array.isArray(data)) {
-    store.push(...data);
-  } else {
-    store.push(data);
+  constructor(
+    timeout = Store.DEFAULT_TIMEOUT_MS,
+    bunchSize = Store.DEFAULT_BUNCH_SIZE
+  ) {
+    this.store = [];
+    this.timeout = timeout;
+    this.bunchSize = bunchSize;
+    this.saveToDb = (__) => {
+      throw new Error("'saveToDb' function should be define by setSaveToDb function");
+    };
+    this.intervalId = setInterval(() => this.pullToDB(), timeout);
   }
-  if (store.length >= DEFAULT_BUNCH_SIZE) {
-    pullToDB();
-    clearInterval(intervalId);
-    intervalId = setInterval(() => pullToDB(), DEFAULT_TIMEOUT_MS);
+
+  public setSaveToDb(saveToDb: (bunch: T[]) => void) {
+    this.saveToDb = saveToDb;
+  }
+
+  private async pullToDB() {
+    if (this.store.length === 0) {
+      return;
+    }
+    const bunch = this.store.slice(0, this.bunchSize);
+    this.store = this.store.slice(this.bunchSize);
+    console.log(`${bunch.length} anonymized items are pulled; ${this.store.length} remain`);
+    await this.saveToDb(bunch);
+  }
+
+  public push(...items: T[]) {
+    if (Array.isArray(items)) {
+      this.store.push(...items);
+    } else {
+      this.store.push(items);
+    }
+    if (this.store.length >= this.bunchSize) {
+      this.pullToDB();
+      clearInterval(this.intervalId);
+      this.intervalId = setInterval(() => this.pullToDB(), this.timeout);
+    }
   }
 }
-
-/**
- * Store anonymized customers to the database.
- * @returns The number of stored customers.
- */
-async function pullToDB(): Promise<number> {
-  if (store.length === 0) {
-    return 0;
-  }
-  const bunch = store.slice(0, DEFAULT_BUNCH_SIZE);
-  store = store.slice(DEFAULT_BUNCH_SIZE);
-  console.log(`${bunch.length} anonymized customers are pulled; ${store.length} remain`);
-  await saveToDb(bunch);
-  return bunch.length;
-}
-
-function init(saveToDbFunc: (bunch: Customer[]) => void, timeout = DEFAULT_TIMEOUT_MS, bs = DEFAULT_BUNCH_SIZE) {
-  saveToDb = saveToDbFunc;
-  bunchSize = bs;
-  intervalId = setInterval(() => pullToDB(), timeout);
-}
-
-export default {
-  init,
-  add,
-};

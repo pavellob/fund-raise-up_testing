@@ -1,77 +1,87 @@
-import { MongoClient, Collection, ChangeStream } from "mongodb";
-import { Customer } from "fru";
+import { DocumentWithId } from "fru";
+import { MongoClient, ChangeStream, Filter } from "mongodb";
 
-const CUSTOMERS_COLLECTION_NAME = "customers"; // Name of the collection containing original customer data
-const ANONYMISED_CUSTOMERS_COLLECTION_NAME = "customers_anonymised"; // Name of the collection to store anonymized customer dat
-const BUNCH_SIZE_LIMIT = 10000; // Number of customers to process in each batch
+export default class DB<T extends DocumentWithId> {
+  private static readonly SOURCE_COLLECTION_NAME = "customers";
+  private static readonly TARGET_COLLECTION_NAME = "customers_anonymised";
+  private static readonly BUNCH_SIZE_LIMIT = 1000;
 
-let changeStream: ChangeStream<Customer>; // Change stream for monitoring customer changes
-let client: MongoClient; // MongoDB client
-let toStore: (data: Customer | Customer[]) => void;
+  private readonly dbName: string;
+  private readonly bunchSizeLimit: number;
+  private client: MongoClient;
+  private changeStream: ChangeStream<T>;
+  private toStore: (...data: T[]) => void;
 
-let DB: {
-  Customers: Collection<Customer>;
-  CustomersAnonymised: Collection<Customer>;
-};
-
-async function init(toStoreFunc: (data: Customer | Customer[]) => void, uri = process.env.DB_URI): Promise<void> {
-  if (!uri) {
-    throw new Error("DB_URI isn't defined in environment variables");
-  }
-  toStore = toStoreFunc;
-  client = await new MongoClient(uri).connect();
-  const DB_NAME = new URL(uri).pathname.substring(1);
-  const db = client.db(DB_NAME);
-  DB = {
-    Customers: db.collection(CUSTOMERS_COLLECTION_NAME),
-    CustomersAnonymised: db.collection(ANONYMISED_CUSTOMERS_COLLECTION_NAME),
-  };
-}
-
-async function storeMissingCustomers(fullReindex = false): Promise<void> {
-  const customersAnonymisedIds = await DB.CustomersAnonymised.distinct("_id");
-  const query = customersAnonymisedIds.length > 0 && !fullReindex ? { _id: { $nin: customersAnonymisedIds } } : {};
-  let skipCount = 0;
-  let bunch: Customer[];
-  do {
-    bunch = await DB.Customers.find(query).limit(BUNCH_SIZE_LIMIT).skip(skipCount).toArray();
-    skipCount += bunch.length;
-    toStore(bunch);
-  } while (bunch.length === BUNCH_SIZE_LIMIT);
-}
-
-function listenCustomerChangeStream(): ChangeStream<Customer> {
-  changeStream = DB.Customers.watch();
-  changeStream.on("change", (next) => {
-    if ((next.operationType === "insert" || next.operationType === "update") && next.fullDocument) {
-      toStore(next.fullDocument);
+  constructor(uri: string, bunchSizeLimit = DB.BUNCH_SIZE_LIMIT) {
+    if (!uri) {
+      throw new Error("DB_URI isn't defined in environment variables");
     }
-  });
-  return changeStream;
-}
+    this.toStore = (__) => {
+      throw new Error("'toStore' function should be defined by setToStore function");
+    };
+    this.client = new MongoClient(uri);
+    this.dbName = new URL(uri).pathname.substring(1);
+    this.changeStream = this.sourceCollection().watch();
+    this.bunchSizeLimit = bunchSizeLimit;
+  }
 
+  public setToStore(toStoreFunc: (...data: T[]) => void) {
+    this.toStore = toStoreFunc;
+  }
 
-async function upsertToAnonymisedCustomers(documents: Customer[]) {
-  const session = client.startSession();
-  try {
-    await session.withTransaction(async () => {
-      const bulkOperations = documents.map((document) => ({
-        updateOne: {
-          filter: { _id: document._id },
-          update: { $set: document },
-          upsert: true,
-        },
-      }));
-      await DB.CustomersAnonymised.bulkWrite(bulkOperations, { session });
+  public async connect() {
+    await this.client.connect();
+  }
+
+  public async close() {
+    await this.client.close();
+    if (this.changeStream) await this.changeStream.close();
+  }
+
+  public listenChangeStream() {
+    this.changeStream.on("change", (next) => {
+      if ((next.operationType === "insert" || next.operationType === "update") && next.fullDocument) {
+        this.toStore && this.toStore(next.fullDocument);
+      }
     });
-  } finally {
-    session.endSession();
+    return this.changeStream;
+  }
+
+  public async storeMissing(fullReindex = false) {
+    const targetsId = await this.targetCollection().distinct("_id");
+    const query = (targetsId.length > 0 && !fullReindex ? { _id: { $nin: targetsId } } : {}) as Filter<T>;
+    let skipCount = 0;
+    let bunch: T[] = [];
+    do {
+      bunch = await this.sourceCollection().find<T>(query).limit(this.bunchSizeLimit).skip(skipCount).toArray();
+      skipCount += bunch.length;
+      this.toStore(...bunch);
+    } while (bunch.length === this.bunchSizeLimit);
+  }
+
+  public async upsertToTargetCollection(documents: T[]) {
+    const session = this.client.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const bulkOperations = documents.map((document) => ({
+          updateOne: {
+            filter: { _id: document._id } as Filter<T>,
+            update: { $set: document },
+            upsert: true,
+          },
+        }));
+        await this.targetCollection().bulkWrite(bulkOperations, { session });
+      });
+    } finally {
+      session.endSession();
+    }
+  }
+
+  private sourceCollection() {
+    return this.client.db(this.dbName).collection<T>(DB.SOURCE_COLLECTION_NAME);
+  }
+
+  private targetCollection() {
+    return this.client.db(this.dbName).collection<T>(DB.TARGET_COLLECTION_NAME);
   }
 }
-
-export default {
-  init,
-  storeMissingCustomers,
-  listenCustomerChangeStream,
-  upsertToAnonymisedCustomers,
-};
