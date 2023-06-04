@@ -1,7 +1,21 @@
-# The Found Raise Up testing exercise.
+# The FoundRaiseUp testing exercise.
+
+## Structure
+
+It's monorepo, powered by turborepo from versel.
+
+### Apps
+
+- `apps/app`: Emulator app, insert documents into MongoDB
+- `apps/sync`: Sync app, sync a source and a target collections with a anonymization
+
+### Packages
+
+- `packages/type`: Common TS definition
+- `packages/tsconfig`: tsconfig.json;s used throughout the monorepo
 ## Installation 
 
-Install **pnpm**, do that:
+Install **pnpm**, if it needed:
 
 ```sh
 npm install -g pnpm
@@ -14,7 +28,7 @@ pnpm install
 
 ##  Configuration
 
-Rename the .env.example file to .env.
+Rename the .env.example file to .env in both application folders.
 Open the .env file and provide the necessary configuration values.
 
 For both applications only need **DB_URI** environment variable.
@@ -42,6 +56,7 @@ pnpm start:fullReindex
 ```sh
 cd apps/app/
 pnpm build
+
 pnpm start
 ```
 
@@ -49,6 +64,7 @@ pnpm start
 
 ```sh
 cd apps/sync/
+
 pnpm build
 
 # Start in Monitoring mode
@@ -59,14 +75,4 @@ pnpm  start --full-reindex
 ```
 
 
-## Structure
 
-### Apps
-
-- `apps/app`: Emulator app, insert documents into MongoDB
-- `apps/sync`: Sync app, sync a source and a target collections with a anonymization
-
-### Packages
-
-- `packages/type`: Common TS definition
-- `packages/tsconfig`: tsconfig.json;s used throughout the monorepo
