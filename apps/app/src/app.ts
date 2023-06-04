@@ -32,9 +32,6 @@ export class InsertToMongoApp<T extends DocumentWithId> {
     this.intervalMs = intervalMs;
     this.minBunchSize = minBunchSize;
     this.maxBunchSize = maxBunchSize;
-
-    parseInt(process.env.MIN_EMULATION_BUNCH_SIZE) || InsertToMongoApp.DEFAULT_MIN_EMULATION_BUNCH_SIZE;
-    parseInt(process.env.MAX_EMULATION_BUNCH_SIZE) || InsertToMongoApp.DEFAULT_MAX_EMULATION_BUNCH_SIZE;
   }
 
   private generateMockedBunch(): T[] {
