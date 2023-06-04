@@ -1,6 +1,6 @@
 module.exports = {
   root: true,
-  extends: ["eslint:recommended", "turbo"],
+  extends: ["eslint:recommended"],
   env: {
     node: true,
     es6: true,

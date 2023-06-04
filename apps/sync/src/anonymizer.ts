@@ -1,7 +1,5 @@
 import { Customer, DocumentWithId } from "fru";
 import { faker } from "@faker-js/faker";
-
-
 export interface Anonymizer<T extends DocumentWithId> {
   anonymize: (item: T) => T 
 }

@@ -1,4 +1,4 @@
-import { DocumentWithId } from "fru";
+import { DocumentWithId } from "../../../packages/zod/dist";
 
 export default class Store<T extends DocumentWithId> {
   public static readonly DEFAULT_TIMEOUT_MS = 1000;

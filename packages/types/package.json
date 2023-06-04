@@ -9,6 +9,7 @@
     "dist/**"
   ],
   "scripts": {
+    "start": "tsc",
     "build": "tsc",
     "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
     "dev": "tsc -w",

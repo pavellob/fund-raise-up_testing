@@ -1,4 +1,4 @@
-import { DocumentWithId } from "fru";
+import { DocumentWithId } from "../../../packages/zod/dist";
 import Store from "./store";
 import DB from "./db";
 import { Anonymizer } from "./anonymizer";

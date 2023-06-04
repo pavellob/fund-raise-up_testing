@@ -1,6 +1,5 @@
 # The Found Raise Up testing exercise.
 
-This is an official starter Turborepo with multiple meta-frameworks all working in harmony and sharing packages.
 
 ## Installation 
 
@@ -14,6 +13,7 @@ Install dependencies:
 ```sh
 pnpm install
 ```
+
 For applications run  the **DB_URI** environment variable should be define. Could set it directly or in **.env** file.
 
 ##  Usage
