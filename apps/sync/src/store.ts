@@ -1,48 +1,47 @@
 import { DocumentWithId } from "fru";
 
 export default class Store<T extends DocumentWithId> {
-  private static readonly DEFAULT_TIMEOUT_MS = 1000;
-  private static readonly DEFAULT_BUNCH_SIZE = 1000;
-  private readonly timeout: number;
-  
+  public static readonly DEFAULT_TIMEOUT_MS = 1000;
+  public static readonly DEFAULT_BUNCH_SIZE = 1000;
+  public readonly timeout: number;
+  public readonly bunchSize: number;
   private store: T[];
   private intervalId: NodeJS.Timer;
-  private bunchSize: number;
-  private saveToDb: (bunch: T[]) => void;
+  private readonly forceReindex: boolean;
 
-  constructor(
-    timeout = Store.DEFAULT_TIMEOUT_MS,
-    bunchSize = Store.DEFAULT_BUNCH_SIZE
-  ) {
+  constructor(forceReindex: boolean, timeout = Store.DEFAULT_TIMEOUT_MS, bunchSize = Store.DEFAULT_BUNCH_SIZE) {
+    this.forceReindex = forceReindex;
     this.store = [];
     this.timeout = timeout;
     this.bunchSize = bunchSize;
-    this.saveToDb = (__) => {
-      throw new Error("'saveToDb' function should be define by setSaveToDb function");
-    };
     this.intervalId = setInterval(() => this.pullToDB(), timeout);
+  }
+
+  private saveToDb(bunch: T[]) {
+    throw new Error(`${Store.name} execution fail: '${this.saveToDb.name}' function should be define`);
   }
 
   public setSaveToDb(saveToDb: (bunch: T[]) => void) {
     this.saveToDb = saveToDb;
   }
 
-  private async pullToDB() {
+  private async pullToDB(pullAll = false) {
     if (this.store.length === 0) {
       return;
     }
     const bunch = this.store.slice(0, this.bunchSize);
     this.store = this.store.slice(this.bunchSize);
-    console.log(`${bunch.length} anonymized items are pulled; ${this.store.length} remain`);
     await this.saveToDb(bunch);
+    if (pullAll) this.pullToDB(pullAll);
+  }
+
+  public async stop() {
+    await this.pullToDB(this.forceReindex);
+    clearInterval(this.intervalId);
   }
 
   public push(...items: T[]) {
-    if (Array.isArray(items)) {
-      this.store.push(...items);
-    } else {
-      this.store.push(items);
-    }
+    this.store.push(...items);
     if (this.store.length >= this.bunchSize) {
       this.pullToDB();
       clearInterval(this.intervalId);

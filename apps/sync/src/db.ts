@@ -2,31 +2,39 @@ import { DocumentWithId } from "fru";
 import { MongoClient, ChangeStream, Filter } from "mongodb";
 
 export default class DB<T extends DocumentWithId> {
-  private static readonly SOURCE_COLLECTION_NAME = "customers";
-  private static readonly TARGET_COLLECTION_NAME = "customers_anonymised";
-  private static readonly BUNCH_SIZE_LIMIT = 1000;
+  public static readonly DEFAULT_SOURCE_COLLECTION_NAME = "customers";
+  public static readonly DEFAULT_TARGET_COLLECTION_NAME = "customers_anonymised";
+  public static readonly DEFAULT_BUNCH_SIZE_LIMIT = 1000;
 
-  private readonly dbName: string;
-  private readonly bunchSizeLimit: number;
+  public readonly dbName: string;
+  public readonly sourceCollectionName: string;
+  public readonly targetCollectionName: string;
+  public readonly bunchSizeLimit: number;
+  public readonly forceReindex: boolean;
   private client: MongoClient;
   private changeStream: ChangeStream<T>;
-  private toStore: (...data: T[]) => void;
 
-  constructor(uri: string, bunchSizeLimit = DB.BUNCH_SIZE_LIMIT) {
+  constructor(
+    uri: string,
+    forceReindex: boolean = false,
+    sourceCollectionName = DB.DEFAULT_SOURCE_COLLECTION_NAME,
+    targetCollectionName = DB.DEFAULT_TARGET_COLLECTION_NAME,
+    bunchSizeLimit = DB.DEFAULT_BUNCH_SIZE_LIMIT
+  ) {
     if (!uri) {
       throw new Error("DB_URI isn't defined in environment variables");
     }
-    this.toStore = (__) => {
-      throw new Error("'toStore' function should be defined by setToStore function");
-    };
+    this.forceReindex = forceReindex;
     this.client = new MongoClient(uri);
     this.dbName = new URL(uri).pathname.substring(1);
-    this.changeStream = this.sourceCollection().watch();
     this.bunchSizeLimit = bunchSizeLimit;
+    this.sourceCollectionName = sourceCollectionName;
+    this.targetCollectionName = targetCollectionName;
+    this.changeStream = this.sourceCollection().watch();
   }
 
-  public setToStore(toStoreFunc: (...data: T[]) => void) {
-    this.toStore = toStoreFunc;
+  public setToStore(toStore: (...data: T[]) => void) {
+    this.toStore = toStore;
   }
 
   public async connect() {
@@ -41,15 +49,15 @@ export default class DB<T extends DocumentWithId> {
   public listenChangeStream() {
     this.changeStream.on("change", (next) => {
       if ((next.operationType === "insert" || next.operationType === "update") && next.fullDocument) {
-        this.toStore && this.toStore(next.fullDocument);
+        this.toStore(next.fullDocument);
       }
     });
     return this.changeStream;
   }
 
-  public async storeMissing(fullReindex = false) {
+  public async storeMissing() {
     const targetsId = await this.targetCollection().distinct("_id");
-    const query = (targetsId.length > 0 && !fullReindex ? { _id: { $nin: targetsId } } : {}) as Filter<T>;
+    const query = (targetsId.length > 0 && !this.forceReindex ? { _id: { $nin: targetsId } } : {}) as Filter<T>;
     let skipCount = 0;
     let bunch: T[] = [];
     do {
@@ -70,18 +78,27 @@ export default class DB<T extends DocumentWithId> {
             upsert: true,
           },
         }));
-        await this.targetCollection().bulkWrite(bulkOperations, { session });
+        await this.targetCollection().bulkWrite(bulkOperations, { session })
+        console.log(
+          `${documents.length} items from '${this.sourceCollectionName}' have been anonymized and saved in '${this.targetCollectionName}'`
+        );
       });
     } finally {
       session.endSession();
     }
+
+    return documents;
+  }
+
+  private toStore(...data: T[]) {
+    throw new Error(`${DB.name} execution fail: '${this.toStore.name}' should be define`);
   }
 
   private sourceCollection() {
-    return this.client.db(this.dbName).collection<T>(DB.SOURCE_COLLECTION_NAME);
+    return this.client.db(this.dbName).collection<T>(this.sourceCollectionName);
   }
 
   private targetCollection() {
-    return this.client.db(this.dbName).collection<T>(DB.TARGET_COLLECTION_NAME);
+    return this.client.db(this.dbName).collection<T>(this.targetCollectionName);
   }
 }

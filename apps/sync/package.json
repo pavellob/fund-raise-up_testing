@@ -1,5 +1,5 @@
 {
-  "name": "@fru/sync-app",
+  "name": "@fru/sync",
   "version": "0.0.0",
   "private": true,
   "main": "./dist/index.js",

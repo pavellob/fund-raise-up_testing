@@ -1,6 +1,8 @@
-import { Document, ObjectId, WithId } from "mongodb";
+import { Document, ObjectId } from "mongodb";
 
-export interface DocumentWithId extends WithId<Document> {}
+export interface DocumentWithId extends Document {
+  _id: ObjectId;
+}
 export interface Customer extends DocumentWithId {
   firstName: string;
   lastName: string;

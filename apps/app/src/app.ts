@@ -1,13 +1,62 @@
 import { faker } from "@faker-js/faker";
+import { Customer, DocumentWithId } from "fru";
 import { MongoClient, ObjectId } from "mongodb";
-import { Customer } from "fru";
 
-const EMULATION_INTERVAL_MS = parseInt(process.env.EMULATION_INTERVAL_MS || "200");
-const MIN_EMULATION_BUNCH_SIZE = parseInt(process.env.MIN_EMULATION_BUNCH_SIZE ?? "20");
-const MAX_EMULATION_BUNCH_SIZE = parseInt(process.env.MAX_EMULATION_BUNCH_SIZE ?? "30");
-const CUSTOMERS_COLLECTION_NAME = process.env.CUSTOMERS_COLLECTION_NAME || "customers";
+export class InsertToMongoApp<T extends DocumentWithId> {
+  private readonly DB_URI: string;
+  private readonly DB_NAME: string;
+  private readonly COLLECTION_NAME: string;
+  private readonly INTERVAL_MS: number;
+  private readonly MIN_BUNCH_SIZE: number;
+  private readonly MAX_BUNCH_SIZE: number;
+  private readonly mockItem: () => T;
 
-function mockedCustomer(): Customer {
+  constructor(mockItem: () => T, collectionName: string) {
+    this.DB_URI = process.env.DB_URI;
+    this.mockItem = mockItem;
+    this.DB_NAME = new URL(this.DB_URI).pathname.substring(1);
+    this.COLLECTION_NAME = collectionName;
+    this.INTERVAL_MS = parseInt(process.env.EMULATION_INTERVAL_MS || "200");
+    this.MIN_BUNCH_SIZE = parseInt(process.env.MIN_EMULATION_BUNCH_SIZE || "20");
+    this.MAX_BUNCH_SIZE = parseInt(process.env.MAX_EMULATION_BUNCH_SIZE || "30");
+    if (!this.DB_URI) {
+      throw new Error("DB_URI isn't defined in environment variables");
+    }
+  }
+
+  private generateMockedBunch(): T[] {
+    return faker.helpers.multiple(this.mockItem, {
+      count: faker.number.int({ min: this.MIN_BUNCH_SIZE, max: this.MAX_BUNCH_SIZE }),
+    });
+  }
+
+  private async insertBunch(bunch: T[]): Promise<void> {
+    const client = new MongoClient(this.DB_URI);
+
+    try {
+      await client.connect();
+      const collection = client.db(this.DB_NAME).collection(this.COLLECTION_NAME);
+      await collection.insertMany(bunch);
+      console.log(`${bunch.length} mocked documents have been added into the '${this.COLLECTION_NAME}'`);
+    } finally {
+      await client.close();
+    }
+  }
+
+  public async emulate() {
+    const bunch = this.generateMockedBunch();
+    await this.insertBunch(bunch);
+  }
+
+  public startEmulation() {
+    setInterval(() => this.emulate(), this.INTERVAL_MS);
+    console.log(
+      `Starting app emulation: Insert from ${this.MIN_BUNCH_SIZE} to ${this.MAX_BUNCH_SIZE} mocked documents into the "${this.COLLECTION_NAME}" every ${this.INTERVAL_MS}ms...`
+    );
+  }
+}
+
+export function mockCustomer(): Customer {
   return {
     _id: new ObjectId(),
     firstName: faker.person.firstName(),
@@ -24,31 +73,3 @@ function mockedCustomer(): Customer {
     createdAt: new Date().toISOString(),
   };
 }
-
-function generateMockedCustomersBunch(): Customer[] {
-  return faker.helpers.multiple(mockedCustomer, {
-    count: faker.number.int({ min: MIN_EMULATION_BUNCH_SIZE, max: MAX_EMULATION_BUNCH_SIZE }),
-  });
-}
-
-async function insertMock(): Promise<void> {
-  if (!process.env.DB_URI) {
-    throw new Error("DB_URI isn't defined in environment variables");
-  }
-  const DB_NAME = new URL(process.env.DB_URI).pathname.substring(1);
-  const client = new MongoClient(process.env.DB_URI);
-  const bunch = generateMockedCustomersBunch();
-  try {
-    await client.connect();
-    await client.db(DB_NAME).collection(CUSTOMERS_COLLECTION_NAME).insertMany(bunch);
-    console.log(`-- ${bunch.length} were added into the DB ${CUSTOMERS_COLLECTION_NAME} Collection`);
-  } finally {
-    await client.close();
-  }
-}
-
-function main(): void {
-  setInterval(insertMock, EMULATION_INTERVAL_MS);
-}
-
-export default main;

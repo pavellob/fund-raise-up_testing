@@ -1,37 +1,71 @@
-# Turborepo kitchen sink starter
+# The Found Raise Up testing exercise.
 
 This is an official starter Turborepo with multiple meta-frameworks all working in harmony and sharing packages.
 
-## Using this example
+## Installation 
 
-Run the following command:
+Install **pnpm**, do that:
 
 ```sh
-npx create-turbo@latest -e kitchen-sink
+npm install -g pnpm
+```
+Install dependencies: 
+
+```sh
+pnpm install
+```
+For applications run  the **DB_URI** environment variable should be define. Could set it directly or in **.env** file.
+
+##  Usage
+
+### Directly
+
+**Start Emulator app**
+
+```sh
+cd apps/app/
+pnpm build
+pnpm start
 ```
 
-## What's inside?
+**Start Sync app**
 
-This Turborepo includes the following packages and apps:
+```sh
+cd apps/sync/
+pnpm build
 
-### Apps and Packages
+# Start in Monitoring mode
+pnpm start
 
-- `api`: an [Express](https://expressjs.com/) server
-- `storefront`: a [Next.js](https://nextjs.org/) app
-- `admin`: a [Vite](https://vitejs.dev/) single page app
-- `blog`: a [Remix](https://remix.run/) blog
-- `logger`: isomorphic logger (a small wrapper around console.log)
-- `ui`: a dummy React UI library (which contains a single `<CounterButton>` component)
-- `scripts`: Jest and ESLint configurations
+# Start in Full Reindex mode
+pnpm  start --full-reindex
+```
+
+### With turbo
+
+**Start Emulator app**
+
+```sh
+turbo --filter=@fru/app start
+```
+
+**Start Sync app**
+
+```sh
+# Start in Monitoring mode
+turbo --filter=@fru/sync start
+
+# Start in Full Reindex mode
+turbo --filter=@fru/sync start --full-reindex
+```
+## Structure
+
+### Apps
+
+- `app`: Emulator app, insert documents into MongoDB
+- `sync`: Sync app, sync a source and a target collections with a anonymization
+
+### Packages
+
+- `type`: Common TS definition
 - `tsconfig`: tsconfig.json;s used throughout the monorepo
-
-Each package and app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Jest](https://jestjs.io) test runner for all things JavaScript
-- [Prettier](https://prettier.io) for code formatting

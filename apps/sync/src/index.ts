@@ -9,7 +9,7 @@ const FORCE_REINDEX_FLAG = "--full-reindex";
 const forceReindex = process.argv.includes(FORCE_REINDEX_FLAG);
 
 const sync = async (forceReindex: boolean) => {
-  const syncApp = new SyncApp<Customer>(false, new CustomerAnonymizer());
+  const syncApp = new SyncApp<Customer>(true, new CustomerAnonymizer());
 
   try {
     await syncApp.start();
