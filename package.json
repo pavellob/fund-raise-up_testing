@@ -1,12 +1,15 @@
 {
   "private": true,
   "scripts": {
+    "start:all": "turbo start",
+    "start:monitor": "turbo start --filter=@fru/sync",
+    "start:fullReindex": "turbo start --filter=@fru/sync -- --full-reindex",
+    "start:emulator": "turbo start --filter=@fru/app",
     "build": "turbo build",
     "clean": "turbo clean",
     "dev": "turbo dev --no-cache  --continue",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "lint": "turbo lint",
-    "test": "turbo test"
+    "lint": "turbo lint"
   },
   "devDependencies": {
     "prettier": "^2.7.1",

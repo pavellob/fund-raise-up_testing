@@ -4,8 +4,16 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const CUSTOMERS_COLLECTION_NAME = 'customers';
+const {
+  DB_URI,
+  EMULATION_TARGET_COLLECTION =  "customers",
+} = process.env;
 
-const app = new InsertToMongoApp<Customer>(mockCustomer, CUSTOMERS_COLLECTION_NAME);
+
+const app = new InsertToMongoApp<Customer>(
+  DB_URI,
+  EMULATION_TARGET_COLLECTION,
+  mockCustomer
+);
+
 app.startEmulation();
-

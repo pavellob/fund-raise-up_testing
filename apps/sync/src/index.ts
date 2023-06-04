@@ -7,9 +7,10 @@ dotenv.config();
 
 const FORCE_REINDEX_FLAG = "--full-reindex";
 const forceReindex = process.argv.includes(FORCE_REINDEX_FLAG);
+const dbURI = process.env.DB_URI;
 
-const sync = async (forceReindex: boolean) => {
-  const syncApp = new SyncApp<Customer>(forceReindex, new CustomerAnonymizer());
+const sync = async (dbURI: string, forceReindex: boolean) => {
+  const syncApp = new SyncApp<Customer>(dbURI, forceReindex, new CustomerAnonymizer());
 
   try {
     await syncApp.start();
@@ -19,4 +20,4 @@ const sync = async (forceReindex: boolean) => {
   }
 };
 
-sync(forceReindex);
+sync(dbURI, forceReindex);

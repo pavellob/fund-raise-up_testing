@@ -1,6 +1,4 @@
 # The Found Raise Up testing exercise.
-
-
 ## Installation 
 
 Install **pnpm**, do that:
@@ -14,11 +12,30 @@ Install dependencies:
 pnpm install
 ```
 
-For applications run  the **DB_URI** environment variable should be define. Could set it directly or in **.env** file.
+##  Configuration
+
+Rename the .env.example file to .env.
+Open the .env file and provide the necessary configuration values.
+
+For both applications only need **DB_URI** environment variable.
 
 ##  Usage
+### From root
 
-### Directly
+```sh
+pnpm build
+
+# Run App & Sync in one time
+pnpm start:all
+# Run Emulator
+pnpm start:emulator
+#Run Sync in monitoring mode
+pnpm start:monitor
+#Run Sync in reindex mode
+pnpm start:fullReindex
+```
+
+### Independent
 
 **Start Emulator app**
 
@@ -41,31 +58,15 @@ pnpm start
 pnpm  start --full-reindex
 ```
 
-### With turbo
 
-**Start Emulator app**
-
-```sh
-turbo --filter=@fru/app start
-```
-
-**Start Sync app**
-
-```sh
-# Start in Monitoring mode
-turbo --filter=@fru/sync start
-
-# Start in Full Reindex mode
-turbo --filter=@fru/sync start --full-reindex
-```
 ## Structure
 
 ### Apps
 
-- `app`: Emulator app, insert documents into MongoDB
-- `sync`: Sync app, sync a source and a target collections with a anonymization
+- `apps/app`: Emulator app, insert documents into MongoDB
+- `apps/sync`: Sync app, sync a source and a target collections with a anonymization
 
 ### Packages
 
-- `type`: Common TS definition
-- `tsconfig`: tsconfig.json;s used throughout the monorepo
+- `packages/type`: Common TS definition
+- `packages/tsconfig`: tsconfig.json;s used throughout the monorepo

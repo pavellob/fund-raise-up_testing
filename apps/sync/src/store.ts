@@ -1,4 +1,4 @@
-import { DocumentWithId } from "../../../packages/zod/dist";
+import { DocumentWithId } from "fru";
 
 export default class Store<T extends DocumentWithId> {
   public static readonly DEFAULT_TIMEOUT_MS = 1000;
@@ -17,35 +17,38 @@ export default class Store<T extends DocumentWithId> {
     this.intervalId = setInterval(() => this.pullToDB(), timeout);
   }
 
-  private saveToDb(bunch: T[]) {
-    throw new Error(`${Store.name} execution fail: '${this.saveToDb.name}' function should be define`);
+  private async saveToDb(bunch: T[]) {
+    throw new Error(`${new Date().toISOString()}: ${Store.name} execution fail: '${this.saveToDb.name}' function should be define`);
   }
 
-  public setSaveToDb(saveToDb: (bunch: T[]) => void) {
+  public setSaveToDb(saveToDb: (bunch: T[]) => Promise<void>) {
     this.saveToDb = saveToDb;
   }
 
-  private async pullToDB(pullAll = false) {
+  private async pullToDB() {
     if (this.store.length === 0) {
       return;
     }
-    const bunch = this.store.slice(0, this.bunchSize);
-    this.store = this.store.slice(this.bunchSize);
-    await this.saveToDb(bunch);
-    if (pullAll) this.pullToDB(pullAll);
+    let bunch: T[];
+    do {
+      bunch = this.store.slice(0, this.bunchSize);
+      this.store = this.store.slice(this.bunchSize);
+      await this.saveToDb(bunch);
+    } while (this.store.length >= this.bunchSize);
+
+    clearInterval(this.intervalId);
+    this.intervalId = setInterval(() => this.pullToDB(), this.timeout);
   }
 
   public async stop() {
-    await this.pullToDB(this.forceReindex);
+    await this.pullToDB();
     clearInterval(this.intervalId);
   }
 
-  public push(...items: T[]) {
+  public async push(...items: T[]) {
     this.store.push(...items);
     if (this.store.length >= this.bunchSize) {
-      this.pullToDB();
-      clearInterval(this.intervalId);
-      this.intervalId = setInterval(() => this.pullToDB(), this.timeout);
+      await this.pullToDB();
     }
   }
 }

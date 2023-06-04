@@ -4,7 +4,7 @@ import { MongoClient, ChangeStream, Filter } from "mongodb";
 export default class DB<T extends DocumentWithId> {
   public static readonly DEFAULT_SOURCE_COLLECTION_NAME = "customers";
   public static readonly DEFAULT_TARGET_COLLECTION_NAME = "customers_anonymised";
-  public static readonly DEFAULT_BUNCH_SIZE_LIMIT = 1000;
+  public static readonly DEFAULT_BUNCH_SIZE_LIMIT = 10000;
 
   public readonly dbName: string;
   public readonly sourceCollectionName: string;
@@ -15,22 +15,22 @@ export default class DB<T extends DocumentWithId> {
   private changeStream: ChangeStream<T>;
 
   constructor(
-    uri: string,
+    dbURI: string,
     forceReindex: boolean = false,
     sourceCollectionName = DB.DEFAULT_SOURCE_COLLECTION_NAME,
     targetCollectionName = DB.DEFAULT_TARGET_COLLECTION_NAME,
     bunchSizeLimit = DB.DEFAULT_BUNCH_SIZE_LIMIT
   ) {
-    if (!uri) {
+    if (!dbURI) {
       throw new Error("DB_URI isn't defined in environment variables");
     }
     this.forceReindex = forceReindex;
-    this.client = new MongoClient(uri);
-    this.dbName = new URL(uri).pathname.substring(1);
+    this.client = new MongoClient(dbURI);
+    this.dbName = new URL(dbURI).pathname.substring(1);
     this.bunchSizeLimit = bunchSizeLimit;
     this.sourceCollectionName = sourceCollectionName;
     this.targetCollectionName = targetCollectionName;
-    this.changeStream = this.sourceCollection().watch();
+    this.changeStream = this.sourceCollection().watch([], { fullDocument: "updateLookup" });
   }
 
   public setToStore(toStore: (...data: T[]) => void) {
@@ -48,22 +48,28 @@ export default class DB<T extends DocumentWithId> {
 
   public listenChangeStream() {
     this.changeStream.on("change", (next) => {
-      if ((next.operationType === "insert" || next.operationType === "update") && next.fullDocument) {
-        this.toStore(next.fullDocument);
+      switch (next.operationType) {
+        case 'insert':
+        case 'replace':
+        case 'update':
+          next.fullDocument && this.toStore(next.fullDocument);
+          break;
+        default:
+          break;
       }
     });
     return this.changeStream;
   }
 
   public async storeMissing() {
-    const targetsId = await this.targetCollection().distinct("_id");
-    const query = (targetsId.length > 0 && !this.forceReindex ? { _id: { $nin: targetsId } } : {}) as Filter<T>;
+    const targetsIds = await this.targetCollection().distinct("_id");
+    const query = (targetsIds.length > 0 && !this.forceReindex ? { _id: { $nin: targetsIds } } : {}) as Filter<T>;
     let skipCount = 0;
     let bunch: T[] = [];
     do {
       bunch = await this.sourceCollection().find<T>(query).limit(this.bunchSizeLimit).skip(skipCount).toArray();
       skipCount += bunch.length;
-      this.toStore(...bunch);
+      await this.toStore(...bunch);
     } while (bunch.length === this.bunchSizeLimit);
   }
 
@@ -78,16 +84,16 @@ export default class DB<T extends DocumentWithId> {
             upsert: true,
           },
         }));
-        await this.targetCollection().bulkWrite(bulkOperations, { session })
+        await this.targetCollection().bulkWrite(bulkOperations, { session });
         console.log(
-          `${documents.length} items from '${this.sourceCollectionName}' have been anonymized and saved in '${this.targetCollectionName}'`
+          `${new Date().toISOString()}: ${documents.length} items from '${
+            this.sourceCollectionName
+          }' have been anonymized and saved in '${this.targetCollectionName}' `
         );
       });
     } finally {
       session.endSession();
-    }
-
-    return documents;
+    };
   }
 
   private toStore(...data: T[]) {

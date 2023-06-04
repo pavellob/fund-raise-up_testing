@@ -3,7 +3,7 @@ import { Customer, DocumentWithId } from "fru";
 import { MongoClient, ObjectId } from "mongodb";
 
 export class InsertToMongoApp<T extends DocumentWithId> {
-  private readonly dbUri: string;
+  private readonly dbURI: string;
   private readonly dbName: string;
   private readonly collectionName: string;
   private readonly intervalMs: number;
@@ -14,19 +14,27 @@ export class InsertToMongoApp<T extends DocumentWithId> {
   private static readonly DEFAULT_MIN_EMULATION_BUNCH_SIZE = 1;
   private static readonly DEFAULT_MAX_EMULATION_BUNCH_SIZE = 10;
 
-  constructor(mockItem: () => T, collectionName: string) {
-    this.dbUri = process.env.DB_URI;
-    if (!this.dbUri) {
-      throw new Error("dbUri isn't defined in environment variables");
+  constructor(
+    dbURI: string,
+    collectionName: string,
+    mockItem: () => T,
+    intervalMs = InsertToMongoApp.DEFAULT_EMULATION_INTERVAL_MS,
+    minBunchSize = InsertToMongoApp.DEFAULT_MIN_EMULATION_BUNCH_SIZE,
+    maxBunchSize = InsertToMongoApp.DEFAULT_MAX_EMULATION_BUNCH_SIZE
+  ) {
+    this.dbURI = dbURI;
+    if (!this.dbURI) {
+      throw new Error("dbURI isn't defined in environment variables");
     }
     this.mockItem = mockItem;
-    this.dbName = new URL(this.dbUri).pathname.substring(1);
+    this.dbName = new URL(this.dbURI).pathname.substring(1);
     this.collectionName = collectionName;
-    this.intervalMs = parseInt(process.env.EMULATION_INTERVAL_MS) || InsertToMongoApp.DEFAULT_EMULATION_INTERVAL_MS;
-    this.minBunchSize =
-      parseInt(process.env.MIN_EMULATION_BUNCH_SIZE) || InsertToMongoApp.DEFAULT_MIN_EMULATION_BUNCH_SIZE;
-    this.maxBunchSize =
-      parseInt(process.env.MAX_EMULATION_BUNCH_SIZE) || InsertToMongoApp.DEFAULT_MAX_EMULATION_BUNCH_SIZE;
+    this.intervalMs = intervalMs;
+    this.minBunchSize = minBunchSize;
+    this.maxBunchSize = maxBunchSize;
+
+    parseInt(process.env.MIN_EMULATION_BUNCH_SIZE) || InsertToMongoApp.DEFAULT_MIN_EMULATION_BUNCH_SIZE;
+    parseInt(process.env.MAX_EMULATION_BUNCH_SIZE) || InsertToMongoApp.DEFAULT_MAX_EMULATION_BUNCH_SIZE;
   }
 
   private generateMockedBunch(): T[] {
@@ -36,13 +44,17 @@ export class InsertToMongoApp<T extends DocumentWithId> {
   }
 
   private async insertBunch(bunch: T[]): Promise<void> {
-    const client = new MongoClient(this.dbUri);
+    const client = new MongoClient(this.dbURI);
 
     try {
       await client.connect();
       const collection = client.db(this.dbName).collection(this.collectionName);
       await collection.insertMany(bunch);
-      console.log(`${bunch.length} mocked documents have been added into the '${this.collectionName}'`);
+      console.log(
+        `${new Date().toISOString()}: ${bunch.length} mocked documents have been added into the '${
+          this.collectionName
+        }'`
+      );
     } finally {
       await client.close();
     }
@@ -56,7 +68,9 @@ export class InsertToMongoApp<T extends DocumentWithId> {
   public startEmulation() {
     setInterval(() => this.emulate(), this.intervalMs);
     console.log(
-      `Starting app emulation: Insert from ${this.minBunchSize} to ${this.maxBunchSize} mocked documents into the "${this.collectionName}" every ${this.intervalMs}ms...`
+      `${new Date().toISOString()}: Starting app emulation: Insert from ${this.minBunchSize} to ${
+        this.maxBunchSize
+      } mocked documents into the "${this.collectionName}" every ${this.intervalMs}ms...`
     );
   }
 }

@@ -1,7 +1,5 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local"],
-  "globalEnv": ["PORT"],
   "pipeline": {
     "build": {
       "outputs": [
@@ -24,9 +22,8 @@
       "persistent": true
     },
     "start": {
-      "dependsOn": ["build"],
-      "cache": false,
-      "persistent": true
+      "dependsOn": ["^build"],
+      "cache": false
     },
     "clean": {
       "cache": false
